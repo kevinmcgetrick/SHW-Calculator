@@ -28,23 +28,35 @@ def NOAA_API_call(station_id, date):
 
 #=============================================================================================#
 
-def recordJSONResponse(hh_tide_values, response): # takes station_id, date, and a reference to hh_tide_values
-# function will modify hh_tide_values with HH value for given date and return nothing
+def recordJSONResponse(tide_values, response): # takes station_id, date, and a reference to tide_values
+# function will modify tide_values with HH value for given date and return nothing
     
     if response.status_code == 200: # Check if request was successful
         try:
-            WLdata = response.json() # convert response into
+            WLdata = response.json() # convert response into variable WLdata
 
-            with open("data.txt", "a") as file:
+            with open("data.txt", "a") as file: # appending json response into text file
                 json.dump(WLdata, file, indent=4)
-    
-            if "data" in WLdata: # appends Higher high tide data to hh_tide_values
-                for entry in WLdata["data"]:
-                    tide_type = entry.get("ty")
 
-                    if tide_type == "HH":
-                        hh_tide_values.append(float(entry["v"]))
-                        #print(float(entry["v"]))
+            firstTideTypeCheck = False # initializing variable to make sure we don't append two HH tide values for the same date
+
+            if "data" in WLdata: # appends Higher high tide data to tide_values
+                for entry in WLdata["data"]: # for each entry in "data" response
+                    tide_type = entry.get("ty") # look at tide type
+                    
+                    if tide_type == "HH" and firstTideTypeCheck == False: # check if this is the first time that tide has been looked at
+                        tide_values.append(float(entry["v"])) # appending value to list
+                        firstTideTypeCheck = True # marking that value was appended
+                        print("Appended HH Value:", float(entry["v"])) # printing appended value
+
+                if firstTideTypeCheck == False: # case there is no data for tide type "HH"
+                    print("Failed to find HH tide data, appending H value:", end=" ")
+                    for entry in WLdata["data"]:
+                        tide_type = entry.get("ty")
+                        if tide_type == "H ":
+                            tide_values.append(float(entry["v"]))
+                            print(float(entry["v"]))
+                            break
 
         except json.JSONDecodeError:
             print("Error: Failed to decode JSON response")
@@ -128,19 +140,29 @@ def getStationID(noaaIDSet):
     return userStationID
 
 def grabStartDate():
-    start_date = input("Input Start Date For Date Range, please use a valid date in YYYYMMDD format:")
+    while (True):
+        start_date = input("\nEnter start date in YYYYMMDD format:")
+        if len(start_date) != 8:
+            print("Invalid input.")
+        else:
+            break
     return start_date
 
 def grabEndDate():
-    end_date = input("Input End Date For Date Range, please use a valid date in YYYYMMDD format:")
+    while (True):
+        end_date = input("\nEnter end date in YYYYMMDD format:")
+        if len(end_date) != 8:
+            print("Invalid input.")
+        else:
+            break
     return end_date
 
 #=============================================================================================#
 
-def exportToExcel(date_list, hh_tide_values, median, average):
+def exportToExcel(date_list, tide_values, median, average):
     
     # Create DataFrame with main data
-    tidevaluedf = pd.DataFrame(list(zip(date_list, hh_tide_values)),
+    tidevaluedf = pd.DataFrame(list(zip(date_list, tide_values)),
                         columns=['Date', 'HH Tide Values (MLLW)'])
     
     # Write to Excel
@@ -182,12 +204,25 @@ def exportToExcel(date_list, hh_tide_values, median, average):
 
 #=============================================================================================#
 
-def printTideValues(date_list, hh_tide_values, date, median, average):
-    print(date_list)
-    print("HH Tide values using MLLW datum from", date_list[0], "to", date, "in chronological order are:\n", hh_tide_values)
+def printTideValues(date_list, tide_values, median, average): # function to print tide values pretty in terminal
 
-    print("The median HH tide value for this date range is:", median)
-    print("The average HH tide value for this date range is:", average)
+    # splitting up first and last value in date list and adding slashes
+    start_date = f"{date_list[0][:4]}/{date_list[0][4:6]}/{date_list[0][6:8]}"
+    end_date = f"{date_list[-1][:4]}/{date_list[-1][4:6]}/{date_list[-1][6:8]}"
+
+    print(f"\nAll Tide values (MLLW) from {start_date} to {end_date} in chronological order:")
+    print("Date - - - - - | Tide Value - - - - - |")
+    i = 0 # setting counter for tracking tide_values in for loop
+
+    for date in date_list:
+        formatted_date = f"{date[:4]}/{date[4:6]}/{date[6:8]}" # formatting date same as above
+        print(formatted_date.ljust(16, ' '), end=" ")
+        if i < (len(tide_values)):
+            print(tide_values[i])
+        i += 1
+
+    print("\nMedian : %3f" % median)
+    print("Average : %3f" % average)
 
 #=============================================================================================#
 
@@ -198,25 +233,37 @@ def wipeDataTxt():
 #=============================================================================================#
 
 def main():
-    hh_tide_values = [] # list to store all higher high tide values
+    #initializing variables
+    tide_values = [] # list to store all higher high tide values
     noaaIDSet = initializeSet()
+
+    # getting values from user
     station_id = str(getStationID(noaaIDSet))
     start_date = str(grabStartDate())
     end_date = str(grabEndDate())
+
+    # determining date list based on user-entered range
     date_list = determineSpringMoonDates(start_date, end_date)
 
+    # wiping old json response data
     wipeDataTxt()
 
-    for d in date_list: # appending all HH tide values to list according to all dates in date_list
+    # appending all HH tide values to list according to all dates in date_list
+    for d in date_list: 
         date = d
         response = NOAA_API_call(station_id, date)
-        recordJSONResponse(hh_tide_values, response)
+        recordJSONResponse(tide_values, response)
+    
+    #print(tide_values) # checking what tide_values list looks like
 
-    copyTideList = list(hh_tide_values)
+    # calculating median and average
+    copyTideList = list(tide_values)
     median = calc_median(copyTideList)
     average = calc_average(copyTideList)
-    printTideValues(date_list, hh_tide_values, date, median, average)
-    exportToExcel(date_list, hh_tide_values, median, average)
+
+    # printing to terminal and updating excel sheet
+    printTideValues(date_list, tide_values, median, average)
+    exportToExcel(date_list, tide_values, median, average)
 
 #=============================================================================================#
 
