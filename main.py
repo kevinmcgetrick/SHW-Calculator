@@ -9,14 +9,16 @@ from openpyxl.styles import Font
 
 #=============================================================================================#
 
-def NOAA_API_call(station_id, date):
+def NOAA_API_call(station_id, date): # modified to take the day after as well
     NOAA_url = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter" # will always be this URL
+
+    next_date = getNextDay(date) # calling api for 2 days
 
     params = { 
         "product": "high_low",  # Changed to get extremes
         "station": station_id,
         "begin_date": date,  # Fetch today's data
-        "end_date": date,    # (required for high_low product)
+        "end_date": next_date, # (required for high_low product)
         "datum": "MLLW",    # grab data in MLLW in case tide station doesn't have available data for NAVD
         "units": "english",
         "time_zone": "GMT",     # Must be uppercase "GMT"
@@ -38,25 +40,15 @@ def recordJSONResponse(tide_values, response): # takes station_id, date, and a r
             with open("data.txt", "a") as file: # appending json response into text file
                 json.dump(WLdata, file, indent=4)
 
-            firstTideTypeCheck = False # initializing variable to make sure we don't append two HH tide values for the same date
-
             if "data" in WLdata: # appends Higher high tide data to tide_values
+                highestEntry = 0
                 for entry in WLdata["data"]: # for each entry in "data" response
-                    tide_type = entry.get("ty") # look at tide type
+                    currentEntry = float(entry["v"])
+                    if currentEntry > highestEntry:
+                        highestEntry = currentEntry
                     
-                    if tide_type == "HH" and firstTideTypeCheck == False: # check if this is the first time that tide has been looked at
-                        tide_values.append(float(entry["v"])) # appending value to list
-                        firstTideTypeCheck = True # marking that value was appended
-                        print("Appended HH Value:", float(entry["v"])) # printing appended value
-
-                if firstTideTypeCheck == False: # case there is no data for tide type "HH"
-                    print("Failed to find HH tide data, appending H value:", end=" ")
-                    for entry in WLdata["data"]:
-                        tide_type = entry.get("ty")
-                        if tide_type == "H ":
-                            tide_values.append(float(entry["v"]))
-                            print(float(entry["v"]))
-                            break
+                tide_values.append(highestEntry)
+                print("Appended:", highestEntry) # printing appended value
 
         except json.JSONDecodeError:
             print("Error: Failed to decode JSON response")
@@ -121,8 +113,8 @@ def determineSpringMoonDates(start_date_str, end_date_str): # will determine all
 
 def getNextDay(current_date): # takes current date as string and gets the next day and returns it as string
     current_date = datetime.strptime(current_date, "%Y%m%d")
-    next_day += current_date + timedelta(days=1)
-    return next_day.strftime("%Y%m%d")
+    next_day = current_date + timedelta(days=1)
+    return str(next_day.strftime("%Y%m%d"))
 
 #=============================================================================================#
 # user input (temporary for date range)
@@ -226,8 +218,8 @@ def printTideValues(date_list, tide_values, median, average): # function to prin
             print(tide_values[i])
         i += 1
 
-    print("\nMedian : %3f" % median)
-    print("Average : %3f" % average)
+    print("\nMedian : %.2f" % median)
+    print("Average : %.2f" % average)
 
 #=============================================================================================#
 
