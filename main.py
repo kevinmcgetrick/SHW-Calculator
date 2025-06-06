@@ -119,6 +119,11 @@ def determineSpringMoonDates(start_date_str, end_date_str): # will determine all
     
     return date_list
 
+def getNextDay(current_date): # takes current date as string and gets the next day and returns it as string
+    current_date = datetime.strptime(current_date, "%Y%m%d")
+    next_day += current_date + timedelta(days=1)
+    return next_day.strftime("%Y%m%d")
+
 #=============================================================================================#
 # user input (temporary for date range)
 
@@ -249,8 +254,7 @@ def main():
     wipeDataTxt()
 
     # appending all HH tide values to list according to all dates in date_list
-    for d in date_list: 
-        date = d
+    for date in date_list:
         response = NOAA_API_call(station_id, date)
         recordJSONResponse(tide_values, response)
     
