@@ -6,6 +6,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font
+from os import system, name
 
 #=============================================================================================#
 
@@ -67,13 +68,13 @@ def calc_median(nums): # simple function to calculate the median of a list
     elif m % 2 == 1:
         return nums[m]
 
-def calc_average(nums):
+def calc_mean(nums):
     sum = 0
     for i in nums:
         sum += i
-    average = sum/len(nums)
+    mean = sum/len(nums)
 
-    return average
+    return mean
 
 #=============================================================================================#
     
@@ -156,7 +157,7 @@ def grabEndDate():
 
 #=============================================================================================#
 
-def exportToExcel(date_list, tide_values, median, average):
+def exportToExcel(date_list, tide_values, median, mean):
     
     # Create DataFrame with main data
     tidevaluedf = pd.DataFrame(list(zip(date_list, tide_values)),
@@ -176,9 +177,9 @@ def exportToExcel(date_list, tide_values, median, average):
     ws.cell(row=stats_row, column=1, value="Median:")
     ws.cell(row=stats_row, column=2, value=median)
     
-    # Add average
-    ws.cell(row=stats_row+1, column=1, value="Average:")
-    ws.cell(row=stats_row+1, column=2, value=average)
+    # Add mean
+    ws.cell(row=stats_row+1, column=1, value="mean:")
+    ws.cell(row=stats_row+1, column=2, value=mean)
     
     # Format columns
     for column in ws.columns:
@@ -201,7 +202,7 @@ def exportToExcel(date_list, tide_values, median, average):
 
 #=============================================================================================#
 
-def printTideValues(date_list, tide_values, median, average): # function to print tide values pretty in terminal
+def printTideValues(date_list, tide_values, median, mean): # function to print tide values pretty in terminal
 
     # splitting up first and last value in date list and adding slashes
     start_date = f"{date_list[0][:4]}/{date_list[0][4:6]}/{date_list[0][6:8]}"
@@ -219,13 +220,34 @@ def printTideValues(date_list, tide_values, median, average): # function to prin
         i += 1
 
     print("\nMedian : %.2f" % median)
-    print("Average : %.2f" % average)
+    print("mean : %.2f" % mean)
 
 #=============================================================================================#
 
 def wipeDataTxt():
     with open("data.txt", "w") as file:
         file.write(" ")
+
+#=============================================================================================#
+
+def printMainMenu(station_id, start_date, end_date): # main menu print function
+
+    if name == 'nt': # clears screen for windows or mac/linux terminal
+        _ = system('cls')
+    else:
+        _ = system('clear')
+
+    print("~~ Spring High Water Calculator ~~")
+    print("Real-time and historical data obtained using NOAA Co-ops API")
+    print(f"Current Station: {station_id}") # print out N/A in case of no station
+    print(f"Current Date Range: {start_date} to {end_date} ") # print out N/A in case of no station
+
+    print("\n[0] - Update NOAA tide station ID") 
+    print("[1] - Update start and end date")
+    print("[2] - Perform NOAA API call")
+    print("[3] - Display data for last API call")
+    print("[4] - Export data to excel")
+    print("[-1] - Exit")
 
 #=============================================================================================#
 
@@ -242,6 +264,7 @@ def main():
     # determining date list based on user-entered range
     date_list = determineSpringMoonDates(start_date, end_date)
 
+
     # wiping old json response data
     wipeDataTxt()
 
@@ -252,14 +275,20 @@ def main():
     
     #print(tide_values) # checking what tide_values list looks like
 
-    # calculating median and average
+    # calculating median and mean
     copyTideList = list(tide_values)
     median = calc_median(copyTideList)
-    average = calc_average(copyTideList)
+    mean = calc_mean(copyTideList)
 
     # printing to terminal and updating excel sheet
-    printTideValues(date_list, tide_values, median, average)
-    exportToExcel(date_list, tide_values, median, average)
+    printTideValues(date_list, tide_values, median, mean)
+    exportToExcel(date_list, tide_values, median, mean)
+
+    # testing
+    stopInput = input("\n[0] - Continue")
+    system('cls')
+    printMainMenu(station_id, start_date, end_date)
+    stopInput = input("")
 
 #=============================================================================================#
 
